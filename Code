@@ -1,0 +1,76 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Keypad.h>
+
+// --- Configuration ---
+const char* masterCode = "1234"; // Set your 4-digit PIN here
+const int relayPin = 16;         // D0 on NodeMCU
+const int lockDelay = 3000;      // How long the door stays open (ms)
+
+// --- Keypad Setup ---
+const byte ROWS = 4; 
+const byte COLS = 4; 
+char keys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+
+byte rowPins[ROWS] = {D3, D4, D5, D6}; 
+byte colPins[COLS] = {D7, D8, 3, 1}; // 3 is RX, 1 is TX
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Change 0x27 to 0x3F if it doesn't work
+
+String inputCode = "";
+
+void setup() {
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW); // Ensure lock is closed
+  
+  lcd.init();
+  lcd.backlight();
+  showIdleMessage();
+}
+
+void loop() {
+  char key = keypad.getKey();
+
+  if (key) {
+    if (key == '#') { // Submit Key
+      checkCode();
+    } else if (key == '*') { // Clear Key
+      resetInput();
+    } else {
+      inputCode += key;
+      lcd.setCursor(inputCode.length() - 1, 1);
+      lcd.print('*'); // Mask the input for security
+    }
+  }
+}
+
+void checkCode() {
+  lcd.clear();
+  if (inputCode == masterCode) {
+    lcd.print("Access Granted");
+    digitalWrite(relayPin, HIGH); // Open Lock
+    delay(lockDelay);
+    digitalWrite(relayPin, LOW);  // Close Lock
+  } else {
+    lcd.print("Invalid Code!");
+    delay(2000);
+  }
+  resetInput();
+}
+
+void resetInput() {
+  inputCode = "";
+  showIdleMessage();
+}
+
+void showIdleMessage() {
+  lcd.clear();
+  lcd.print("Enter Code:");
+  lcd.setCursor(0, 1);
+}
